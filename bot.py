@@ -4,7 +4,7 @@ import time
 import os
 
 # Fetch the token securely from Railway's environment variables
-BOT_TOKEN = os.getenv("")
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 if not BOT_TOKEN:
     raise ValueError("BOT_TOKEN environment variable is missing!")
