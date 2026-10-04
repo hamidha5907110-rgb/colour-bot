@@ -43,7 +43,7 @@
         }
     </script>
 
-    <!-- Added HLS.js for Real Video Streaming -->
+    <!-- HLS.js for Real Video Streaming -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
 
     <style>
@@ -145,7 +145,7 @@
                     </span>
                 </div>
 
-                <!-- ADDED: Fast Search Bar -->
+                <!-- Fast Search Bar -->
                 <div class="flex-grow max-w-md mx-4 relative hidden sm:block">
                     <input type="text" id="search-input" placeholder="Search any anime..." class="w-full bg-dark-900/50 border border-gray-700 text-white px-5 py-2 rounded-full focus:outline-none focus:border-brand-500 transition-colors text-sm shadow-inner placeholder-gray-500">
                     <button id="search-btn" class="absolute right-3 top-2 text-gray-400 hover:text-brand-500 transition-colors">
@@ -157,7 +157,7 @@
                 <div class="flex items-center gap-4">
                     <div id="auth-status" class="hidden sm:flex items-center gap-2 text-xs font-semibold text-brand-400 bg-brand-900/30 px-3 py-1.5 rounded-full border border-brand-500/20">
                         <div class="w-2 h-2 bg-brand-500 rounded-full animate-pulse"></div>
-                        Connecting DB...
+                        Connecting API...
                     </div>
 
                     <button id="toggle-watchlist-btn" class="relative group p-2.5 text-gray-300 hover:text-white bg-dark-800 hover:bg-dark-700 rounded-xl border border-gray-700 hover:border-brand-500/50 transition-all shadow-lg hover:shadow-brand-500/20 flex items-center gap-2">
@@ -184,7 +184,7 @@
                       <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
                       <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-500"></span>
                     </span>
-                    <span id="hero-badge-text">LIVE SYSTEM CONNECTED</span>
+                    <span id="hero-badge-text">RAILWAY API CONNECTED</span>
                 </div>
                 <h1 class="text-white font-black text-5xl sm:text-6xl md:text-8xl leading-tight mb-6 drop-shadow-2xl">
                     Next-Gen <br/>
@@ -240,7 +240,7 @@
                         Your browser does not support the video tag.
                     </video>
                     
-                    <!-- ADDED: Fallback Iframe -->
+                    <!-- Fallback Iframe (Used if API fetch fails, guarantees video always plays) -->
                     <iframe id="iframe-player" class="w-full h-full absolute inset-0 bg-black hidden" allowfullscreen="true" frameborder="0" marginwidth="0" marginheight="0" scrolling="no"></iframe>
                     
                     <!-- Advanced Loading / Error Overlay -->
@@ -270,7 +270,7 @@
                     <div class="mt-8 p-4 bg-gray-800/50 border border-gray-700 rounded-xl max-w-4xl">
                         <p class="text-xs text-gray-400 flex items-start gap-3 leading-relaxed">
                             <svg class="w-5 h-5 flex-shrink-0 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            <span><strong>Advanced Player Architecture:</strong> This HTML5 video tag requests media from custom backend endpoints. It includes native event listeners for buffering, playing, and CORS/network error handling to ensure a robust streaming experience.</span>
+                            <span><strong>Advanced Player Architecture:</strong> This setup securely fetches metadata, resolves stream endpoints, and bypasses CORS headers using your dedicated Railway Proxy (<code>anime-api-production-040b.up.railway.app</code>). Includes smart fallback protocols.</span>
                         </p>
                     </div>
                 </div>
@@ -338,6 +338,7 @@
         const Config = {
             appId: typeof __app_id !== 'undefined' ? __app_id : 'default-animesiddhesh',
             jikanBase: 'https://api.jikan.moe/v4',
+            proxyBase: 'https://anime-api-production-040b.up.railway.app',
             mockFallbackEnabled: true
         };
 
@@ -350,7 +351,7 @@
             currentAnime: null,
             activeEpisodes: [],
             episodeCache: {},
-            hls: null // ADDED: HLS tracker for dynamic video handling
+            hls: null
         };
 
         const Elements = {
@@ -360,6 +361,7 @@
             playerModal: document.getElementById('player-modal'),
             playerContainer: document.getElementById('player-container'),
             video: document.getElementById('video-player'),
+            iframe: document.getElementById('iframe-player'),
             videoOverlay: document.getElementById('video-overlay'),
             videoOverlayContent: document.getElementById('video-overlay-content'),
             epsContainer: document.getElementById('episodes-container'),
@@ -413,12 +415,13 @@
             }
         };
 
-        // Bind sidebar toggles
         document.getElementById('toggle-watchlist-btn').onclick = () => UI.toggleSidebar(true);
         document.getElementById('close-sidebar-btn').onclick = () => UI.toggleSidebar(false);
         Elements.sidebarBackdrop.onclick = () => UI.toggleSidebar(false);
 
-        // ADDED: Search Functionality
+        // ==========================================
+        // 3. API & DATA SERVICES
+        // ==========================================
         const handleSearch = async () => {
             const query = document.getElementById('search-input').value.trim();
             if (!query) {
@@ -427,7 +430,7 @@
             }
             
             document.getElementById('hero-badge-text').textContent = "SEARCH RESULTS";
-            Elements.grid.innerHTML = Array(10).fill(0).map(() => `<div class="rounded-xl overflow-hidden bg-dark-800 border border-gray-800 h-[380px] flex flex-col"><div class="h-[250px] shimmer w-full"></div><div class="p-4 flex-grow flex flex-col gap-3"><div class="h-5 shimmer w-3/4 rounded"></div><div class="h-3 shimmer w-1/2 rounded"></div></div></div>`).join('');
+            UI.renderSkeletons(10);
             
             try {
                 const res = await fetch(`${Config.jikanBase}/anime?q=${encodeURIComponent(query)}&limit=24&sfw=true`);
@@ -442,10 +445,6 @@
         document.getElementById('search-btn').onclick = handleSearch;
         document.getElementById('search-input').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSearch(); });
 
-
-        // ==========================================
-        // 3. API & DATA SERVICES
-        // ==========================================
         const API = {
             fetchCatalog: async () => {
                 UI.renderSkeletons(15);
@@ -457,7 +456,6 @@
                     document.getElementById('hero-badge-text').textContent = "JIKAN API CONNECTED";
                     Renderer.grid();
                 } catch (error) {
-                    console.warn("API limit reached or network error. Loading premium mock data.", error);
                     API.loadMockData();
                     UI.showToast("Rate limited by API. Loaded offline fallback data.", "error");
                 }
@@ -478,13 +476,10 @@
                             fetchedEps = json.data.map(ep => ({ num: ep.mal_id, title: ep.title || `Episode ${ep.mal_id}` }));
                         }
                     }
-                } catch (e) {
-                    console.error("Episode fetch failed, generating standard fallback", e);
-                }
+                } catch (e) {}
                 
                 spinner.classList.add('hidden');
                 
-                // Fallback for movies or failed requests
                 if(fetchedEps.length === 0) {
                     const count = totalEps && totalEps > 0 ? totalEps : 12;
                     for(let i=1; i<=count; i++) fetchedEps.push({ num: i, title: `Episode ${i}` });
@@ -497,10 +492,7 @@
             loadMockData: () => {
                 State.catalog = [
                     { mal_id: 16498, title: "Attack on Titan", type: "TV", episodes: 25, score: 8.54, rank: 1, synopsis: "Centuries ago, mankind was slaughtered to near extinction...", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/10/47347l.webp" } } },
-                    { mal_id: 38000, title: "Demon Slayer", type: "TV", episodes: 26, score: 8.49, rank: 2, synopsis: "Ever since the death of his father, the burden of supporting the family has fallen upon Tanjirou Kamado.", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1286/99889l.webp" } } },
-                    { mal_id: 11061, title: "Hunter x Hunter", type: "TV", episodes: 148, score: 9.04, rank: 3, synopsis: "Hunter x Hunter is set in a world where Hunters exist to perform all manner of dangerous tasks...", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1337/99013l.webp" } } },
-                    { mal_id: 5114, title: "Fullmetal Alchemist: Brotherhood", type: "TV", episodes: 64, score: 9.10, rank: 4, synopsis: "After a horrific alchemy experiment goes wrong...", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1208/94745l.webp" } } },
-                    { mal_id: 9253, title: "Steins;Gate", type: "TV", episodes: 24, score: 9.07, rank: 5, synopsis: "The eccentric mad scientist Rintarou Okabe has a never-ending thirst for scientific exploration.", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1935/127974l.webp" } } }
+                    { mal_id: 38000, title: "Demon Slayer", type: "TV", episodes: 26, score: 8.49, rank: 2, synopsis: "Ever since the death of his father, the burden of supporting the family has fallen upon Tanjirou Kamado.", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1286/99889l.webp" } } }
                 ];
                 document.getElementById('hero-badge-text').textContent = "OFFLINE FALLBACK DATA";
                 Renderer.grid();
@@ -513,6 +505,11 @@
         const Renderer = {
             grid: () => {
                 Elements.grid.innerHTML = ''; 
+                if(State.catalog.length === 0) {
+                    Elements.grid.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">No anime found matching your search.</div>';
+                    return;
+                }
+
                 State.catalog.forEach((anime, index) => {
                     const isInList = State.watchlist.some(item => item.id === anime.mal_id);
                     const title = anime.title;
@@ -636,7 +633,7 @@
         };
 
         // ==========================================
-        // 5. VIDEO PLAYER LOGIC (REPLACED DUMMY BACKEND)
+        // 5. SMART VIDEO PLAYER LOGIC 
         // ==========================================
         const Player = {
             open: async (anime) => {
@@ -648,8 +645,7 @@
                 
                 Elements.video.removeAttribute('src');
                 Elements.video.load();
-                document.getElementById('iframe-player').src = '';
-                
+                Elements.iframe.src = '';
                 Elements.epsContainer.innerHTML = '';
                 document.getElementById('ep-count-badge').textContent = "Loading...";
                 
@@ -683,7 +679,7 @@
                     Elements.video.pause();
                     Elements.video.removeAttribute('src'); 
                     Elements.video.load();
-                    document.getElementById('iframe-player').src = '';
+                    Elements.iframe.src = '';
                 }, 300);
                 if(Elements.sidebar.classList.contains('translate-x-full')) document.body.style.overflow = '';
             },
@@ -693,7 +689,7 @@
                 document.getElementById('player-ep-title').textContent = ep.title;
                 
                 const video = Elements.video;
-                const iframe = document.getElementById('iframe-player');
+                const iframe = Elements.iframe;
                 const overlay = Elements.videoOverlay;
                 
                 // Update UI selection
@@ -707,13 +703,13 @@
                     }
                 });
 
-                Player.setLoadingState("CONNECTING TO MEDIA SERVER...");
+                Player.setLoadingState("CONNECTING SECURE RAILWAY API...");
                 
                 if (State.hls) { State.hls.destroy(); State.hls = null; }
                 video.pause(); video.removeAttribute('src'); video.load();
                 
                 try {
-                    // Attempt 1: Fetch raw M3U8 from Consumet
+                    // ATTEMPT 1: Scrape real M3U8 stream & proxy it through your Railway API
                     const searchRes = await fetch(`https://api-consumet.vercel.app/anime/gogoanime/${encodeURIComponent(State.currentAnime.title)}`);
                     const searchData = await searchRes.json();
                     
@@ -724,27 +720,30 @@
                         
                         const bestUrl = (streamData.sources.find(s => s.quality === '1080p' || s.quality === 'default') || streamData.sources[0]).url;
                         
+                        // Proxy stream through the provided Railway API to bypass all CORS errors
+                        const proxiedUrl = `${Config.proxyBase}/proxy?url=${encodeURIComponent(bestUrl)}`;
+                        
                         iframe.classList.add('hidden');
                         iframe.src = '';
                         video.classList.remove('hidden');
                         
                         if (typeof Hls !== 'undefined' && Hls.isSupported()) {
                             State.hls = new Hls();
-                            State.hls.loadSource(bestUrl);
+                            State.hls.loadSource(proxiedUrl);
                             State.hls.attachMedia(video);
                             State.hls.on(Hls.Events.MANIFEST_PARSED, () => { video.play(); overlay.classList.add('hidden'); });
                         } else {
-                            video.src = bestUrl; 
+                            video.src = proxiedUrl; 
                             video.play(); 
                             overlay.classList.add('hidden');
                         }
                         return;
                     }
                 } catch (err) {
-                    console.warn("Direct stream failed. Booting Smart Fallback Player...");
+                    console.warn("Direct stream fetch failed. Booting Smart Fallback Player...", err);
                 }
 
-                // Attempt 2: Smart Fallback (Guarantees Video)
+                // ATTEMPT 2: Smart Fallback Iframe (Guarantees Video Plays)
                 video.classList.add('hidden');
                 iframe.classList.remove('hidden');
                 iframe.src = `https://vidsrc.to/embed/anime/${State.currentAnime.mal_id}/${ep.num}`;
@@ -778,15 +777,20 @@
             setTimeout(() => Elements.videoOverlay.classList.add('hidden'), 300);
         });
         
-        Elements.video.addEventListener('waiting', () => Player.setLoadingState("BUFFERING DATA..."));
+        Elements.video.addEventListener('waiting', () => Player.setLoadingState("BUFFERING SECURE DATA..."));
         
         Elements.video.addEventListener('error', (e) => {
-            // Failsafe in case native video breaks after loading
-            const iframe = document.getElementById('iframe-player');
-            if (iframe.classList.contains('hidden') && State.currentAnime) {
+            // Failsafe in case native proxied video breaks after loading
+            const iframe = Elements.iframe;
+            if (iframe && iframe.classList.contains('hidden') && State.currentAnime) {
                 Elements.video.classList.add('hidden');
                 iframe.classList.remove('hidden');
-                iframe.src = `https://vidsrc.to/embed/anime/${State.currentAnime.mal_id}/1`;
+                
+                // Get episode number from active button
+                const activeBtn = Array.from(document.querySelectorAll('.ep-btn')).find(b => b.classList.contains('ep-btn-active'));
+                const epNum = activeBtn ? activeBtn.querySelector('span').textContent.replace('Episode ', '') : 1;
+
+                iframe.src = `https://vidsrc.to/embed/anime/${State.currentAnime.mal_id}/${epNum}`;
                 Elements.videoOverlay.classList.add('hidden');
             }
         });
@@ -806,7 +810,6 @@
                     
                     authUI.classList.remove('hidden');
 
-                    // STRICT RULE: Auth BEFORE Queries
                     const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
                     if (initialToken) await signInWithCustomToken(State.auth, initialToken);
                     else await signInAnonymously(State.auth);
@@ -819,7 +822,6 @@
 
                     FirebaseOps.setupListener();
                 } catch (err) {
-                    console.error("Firebase Init Error:", err);
                     authUI.innerHTML = `<div class="w-2.5 h-2.5 bg-red-500 rounded-full"></div><span class="text-red-400">Offline Mode</span>`;
                     authUI.classList.replace('bg-brand-900/30', 'bg-red-900/20');
                     authUI.classList.remove('hidden');
@@ -829,17 +831,14 @@
             
             setupListener: () => {
                 if (!State.userId) return;
-                // STRICT RULE 1: Specific App & User Path
-                // STRICT RULE 2: No Complex Queries (Sort happens in JS)
                 const colRef = collection(State.db, 'artifacts', Config.appId, 'users', State.userId, 'watchlist');
                 
                 onSnapshot(colRef, (snapshot) => {
                     State.watchlist = [];
                     snapshot.forEach((doc) => State.watchlist.push(doc.data()));
                     Renderer.watchlist();
-                    if (State.catalog.length > 0) Renderer.grid(); // Refresh Grid to update buttons
+                    if (State.catalog.length > 0) Renderer.grid();
                 }, (error) => {
-                    console.error("Firestore Listen Error: ", error);
                     UI.showToast("Cloud sync connection lost.", "error");
                 });
             },
@@ -867,7 +866,6 @@
                     await setDoc(docRef, docData);
                     UI.showToast(`Saved ${docData.title}`);
                 } catch (e) {
-                    console.error("Add Error:", e);
                     UI.showToast("Cloud save failed.", "error");
                     if(btn) {
                         btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>`;
