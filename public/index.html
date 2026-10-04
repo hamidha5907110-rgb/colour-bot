@@ -1,0 +1,1081 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnimeSiddhesh | Advanced Anime Hub</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            300: '#c4b5fd', 400: '#a78bfa', 500: '#8b5cf6',
+                            600: '#7c3aed', 700: '#6d28d9', 900: '#4c1d95',
+                        },
+                        dark: {
+                            800: '#1e293b', 900: '#0f172a', 950: '#020617',
+                        }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    animation: {
+                        'gradient-x': 'gradient-x 15s ease infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.5s ease-out forwards',
+                        'slide-in-right': 'slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 3s linear infinite',
+                    },
+                    keyframes: {
+                        'gradient-x': {
+                            '0%, 100%': { 'background-size': '200% 200%', 'background-position': 'left center' },
+                            '50%': { 'background-size': '200% 200%', 'background-position': 'right center' }
+                        },
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { opacity: '0', transform: 'translateY(20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+                        slideInRight: { '0%': { transform: 'translateX(100%)' }, '100%': { transform: 'translateX(0)' } }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HLS.js (real anime streams) -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+    <!-- DASH.js fallback -->
+    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; border: 2px solid #0f172a; }
+        ::-webkit-scrollbar-thumb:hover { background: #8b5cf6; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { border: none; }
+
+        .glass-nav {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .anime-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .anime-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            box-shadow: 0 20px 25px -5px rgba(139, 92, 246, 0.2), 0 8px 10px -6px rgba(139, 92, 246, 0.2);
+            border-color: rgba(139, 92, 246, 0.4);
+            z-index: 10;
+        }
+        .card-image { transition: transform 0.7s ease; }
+        .anime-card:hover .card-image { transform: scale(1.08); }
+        
+        .image-overlay {
+            background: linear-gradient(to top, rgba(15,23,42,1) 0%, rgba(15,23,42,0.2) 60%, transparent 100%);
+        }
+
+        .shimmer {
+            background: #1e293b;
+            background-image: linear-gradient(to right, #1e293b 0%, #334155 20%, #1e293b 40%, #1e293b 100%);
+            background-repeat: no-repeat;
+            background-size: 800px 100%; 
+            animation: placeholderShimmer 1.5s linear infinite forwards;
+        }
+        @keyframes placeholderShimmer {
+            0% { background-position: -468px 0; }
+            100% { background-position: 468px 0; }
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: bottom 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 9999;
+        }
+        .toast.show { bottom: 24px; }
+        .play-pulse:hover { animation: pulse 1s infinite; }
+        .ep-btn-active {
+            background: linear-gradient(135deg, #7c3aed, #8b5cf6) !important;
+            color: white !important;
+            border-color: #a78bfa !important;
+            box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+            font-weight: 700 !important;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col relative">
+
+    <nav class="fixed w-full z-50 glass-nav transition-all duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0 flex items-center gap-3 cursor-pointer group" onclick="window.scrollTo(0,0)">
+                    <div class="p-2 bg-gradient-to-br from-brand-600 to-brand-500 rounded-xl shadow-lg shadow-brand-500/30 group-hover:shadow-brand-500/50 transition-all">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <span class="font-black text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-300 via-brand-500 to-white">
+                        AnimeSiddhesh
+                    </span>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <div id="auth-status" class="hidden sm:flex items-center gap-2 text-xs font-semibold text-brand-400 bg-brand-900/30 px-3 py-1.5 rounded-full border border-brand-500/20">
+                        <div class="w-2 h-2 bg-brand-500 rounded-full animate-pulse"></div>
+                        Connecting DB...
+                    </div>
+
+                    <button id="toggle-watchlist-btn" class="relative group p-2.5 text-gray-300 hover:text-white bg-dark-800 hover:bg-dark-700 rounded-xl border border-gray-700 hover:border-brand-500/50 transition-all shadow-lg hover:shadow-brand-500/20 flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                        <span class="hidden sm:inline font-bold text-sm">Watchlist</span>
+                        <span id="nav-watchlist-count" class="absolute -top-2 -right-2 bg-brand-600 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-dark-900 shadow-sm scale-0 transition-transform duration-300">0</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="relative pt-16 pb-24 flex content-center items-center justify-center min-h-[55vh] overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-br from-indigo-950 via-slate-900 to-brand-950 animate-gradient-x opacity-90"></div>
+        <div class="absolute top-20 left-10 w-96 h-96 bg-brand-600 rounded-full mix-blend-screen filter blur-[100px] opacity-30 animate-pulse-slow"></div>
+        <div class="absolute bottom-10 right-20 w-[500px] h-[500px] bg-blue-600 rounded-full mix-blend-screen filter blur-[120px] opacity-20 animate-pulse-slow" style="animation-delay: 2s;"></div>
+        <div class="absolute inset-0 bg-dark-900/60 bg-gradient-to-t from-dark-950 via-transparent to-transparent"></div>
+        
+        <div class="container relative mx-auto px-4 sm:px-6 lg:px-8 mt-12 z-10">
+            <div class="flex flex-col items-center text-center animate-slide-up">
+                <div class="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-dark-900/80 backdrop-blur-md border border-brand-500/40 text-brand-300 text-xs font-bold tracking-widest mb-8 shadow-[0_0_15px_rgba(139,92,246,0.2)]">
+                    <span class="relative flex h-2.5 w-2.5">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-500"></span>
+                    </span>
+                    <span id="hero-badge-text">LIVE SYSTEM CONNECTED</span>
+                </div>
+                <h1 class="text-white font-black text-5xl sm:text-6xl md:text-8xl leading-tight mb-6 drop-shadow-2xl">
+                    Next-Gen <br/>
+                    <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-400 to-blue-400">Anime Streaming.</span>
+                </h1>
+                <p class="text-lg md:text-xl text-gray-300 mb-10 max-w-3xl mx-auto font-medium leading-relaxed opacity-90">
+                    Track, sync, and stream your favorite series directly from your self-hosted endpoints with our advanced cinematic player.
+                </p>
+                <div class="flex flex-wrap gap-4 justify-center">
+                    <button onclick="document.getElementById('main-content').scrollIntoView()" class="bg-brand-600 hover:bg-brand-500 text-white font-bold py-4 px-8 rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:shadow-[0_0_30px_rgba(139,92,246,0.6)] transition-all duration-300 flex items-center gap-2 transform hover:-translate-y-1">
+                        Explore Catalog
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main id="main-content" class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-16 relative z-10">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-10 gap-4">
+            <div>
+                <h2 class="text-3xl md:text-4xl font-black text-white relative inline-block">
+                    Trending Catalog
+                    <div class="absolute -bottom-3 left-0 w-1/2 h-1.5 bg-gradient-to-r from-brand-500 to-transparent rounded-full"></div>
+                </h2>
+                <p class="text-gray-400 mt-4 text-sm font-medium">Data synchronized from Global API Networks</p>
+            </div>
+        </div>
+
+        <div id="anime-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 lg:gap-8">
+        </div>
+    </main>
+
+    <div id="player-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center opacity-0 transition-opacity duration-300">
+        <div id="player-backdrop" class="absolute inset-0 bg-black/95 backdrop-blur-xl"></div>
+        
+        <div class="relative w-full max-w-[1500px] max-h-[95vh] h-full mx-2 sm:mx-6 bg-dark-900 border border-gray-700/50 rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-hidden transform scale-95 transition-transform duration-300" id="player-container">
+            
+            <button id="close-player-btn" class="absolute top-4 right-4 lg:-right-12 lg:top-0 z-30 p-2.5 bg-brand-600/80 text-white rounded-full hover:bg-brand-500 transition-colors shadow-lg backdrop-blur-md hidden lg:block">
+                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <button id="close-player-btn-mobile" class="absolute top-3 right-3 z-30 p-2 bg-black/60 text-white rounded-full hover:bg-brand-500 transition-colors shadow-lg backdrop-blur-md lg:hidden border border-white/10">
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            
+            <div class="flex-grow flex flex-col lg:w-[75%] border-b lg:border-b-0 lg:border-r border-gray-800 relative bg-black">
+                <div class="w-full aspect-video bg-black relative shadow-2xl overflow-hidden group">
+                    <video id="video-player" class="w-full h-full absolute inset-0 object-contain bg-black" controls controlsList="nodownload" playsinline crossorigin="anonymous">
+                        <source src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    
+                    <div id="video-overlay" class="absolute inset-0 flex items-center justify-center bg-dark-950 z-10 transition-opacity duration-300">
+                        <div class="flex flex-col items-center gap-6" id="video-overlay-content">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-grow bg-gradient-to-b from-dark-900 to-dark-950 relative">
+                    <h2 id="player-anime-title" class="text-3xl sm:text-4xl font-black text-white mb-3 leading-tight">Anime Title</h2>
+                    
+                    <div class="flex flex-wrap items-center gap-3 text-sm text-gray-300 mb-6">
+                        <span id="player-ep-label" class="bg-brand-600 text-white px-3 py-1.5 rounded-lg font-bold shadow-[0_0_15px_rgba(139,92,246,0.3)] border border-brand-400/50">Episode 1</span>
+                        <span id="player-ep-title" class="bg-dark-800 px-3 py-1.5 rounded-lg border border-gray-700 font-medium truncate max-w-[250px]">Episode Name</span>
+                        <span id="player-status-label" class="bg-dark-800 px-3 py-1.5 rounded-lg border border-gray-700 font-medium text-yellow-400 flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg> 
+                            <span id="player-score">0.0</span>
+                        </span>
+                    </div>
+                    
+                    <h4 class="text-white font-bold mb-2">Synopsis</h4>
+                    <p id="player-anime-synopsis" class="text-gray-400 text-sm leading-relaxed max-w-4xl">Synopsis goes here...</p>
+                    
+                    <div class="mt-8 p-4 bg-gray-800/50 border border-gray-700 rounded-xl max-w-4xl">
+                        <p class="text-xs text-gray-400 flex items-start gap-3 leading-relaxed">
+                            <svg class="w-5 h-5 flex-shrink-0 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            <span><strong>Advanced Player Architecture:</strong> HLS.js + DASH.js streaming via self-hosted Kuhi backend. Real episode streams are proxied through your server for CORS-safe playback.</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="lg:w-[25%] w-full h-[40vh] lg:h-full flex flex-col bg-dark-900 shadow-[-10px_0_20px_rgba(0,0,0,0.5)] z-10">
+                <div class="p-5 border-b border-gray-800 bg-dark-800 sticky top-0 z-10 flex justify-between items-center">
+                    <h3 class="font-bold text-white flex items-center gap-2">
+                        <svg class="w-5 h-5 text-brand-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path></svg>
+                        Episodes
+                    </h3>
+                    <div class="flex items-center gap-2">
+                        <div id="ep-loading-spinner" class="hidden w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                        <span id="ep-count-badge" class="text-xs font-bold bg-dark-950 text-gray-400 px-2.5 py-1 rounded-md border border-gray-700">Loading...</span>
+                    </div>
+                </div>
+                <div id="episodes-container" class="flex-grow overflow-y-auto p-3 flex flex-col gap-2 custom-scrollbar bg-dark-900">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="sidebar-backdrop" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[60] hidden opacity-0 transition-opacity duration-300"></div>
+    
+    <aside id="watchlist-sidebar" class="fixed inset-y-0 right-0 w-full sm:w-[420px] glass-panel z-[70] transform translate-x-full shadow-2xl flex flex-col border-l border-white/10 transition-transform duration-400 ease-in-out">
+        <div class="p-6 border-b border-gray-700/50 flex items-center justify-between bg-dark-800/80 backdrop-blur">
+            <div class="flex items-center gap-4">
+                <div class="p-2.5 bg-brand-500/20 rounded-xl border border-brand-500/30">
+                    <svg class="w-6 h-6 text-brand-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-xl font-black text-white tracking-wide">Cloud Watchlist</h3>
+                    <p class="text-xs text-green-400 font-medium flex items-center gap-1 mt-0.5">
+                        <span class="w-1.5 h-1.5 bg-green-500 rounded-full inline-block animate-pulse"></span> Firebase Synced
+                    </p>
+                </div>
+            </div>
+            <button id="close-sidebar-btn" class="p-2.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-xl transition-all">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <div id="watchlist-container" class="flex-grow overflow-y-auto p-4 space-y-3 custom-scrollbar bg-dark-900/50">
+            <div class="flex justify-center items-center h-full">
+                <svg class="animate-spin h-8 w-8 text-brand-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </div>
+        </div>
+    </aside>
+
+    <div id="toast" class="toast glass-nav px-6 py-3 rounded-full border border-gray-700 flex items-center gap-3 shadow-[0_10px_40px_rgba(0,0,0,0.5)]">
+        <div id="toast-icon"></div>
+        <span id="toast-message" class="text-sm font-bold text-white tracking-wide">Notification</span>
+    </div>
+
+    <!-- =========================================================
+         AS_CONFIG — edit this to point at your servers.
+         ========================================================= -->
+    <script>
+    window.AS_CONFIG = {
+        proxyBase: '/api',
+        kuhiBase: 'http://localhost:8000',
+        endpoints: {
+            auth:     '/auth/v1/token',
+            seasons:  '/content/v2/cms/series/{id}/seasons',
+            episodes: '/content/v2/cms/seasons/{id}/episodes',
+            stream:   '/play/v1/stream',
+            license:  '/play/v1/license',
+            video:    '/video/stream'
+        },
+        apiKey: null,
+        region: 'US',
+        player: {
+            autoplay: true,
+            preferredSubLang: 'en-US',
+            preferredAudio: 'ja-JP',
+            demoFallback: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8'
+        }
+    };
+    </script>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        /* ============================================================
+           AniListMapper — MAL (Jikan) ID → AniList ID
+           ============================================================ */
+        const AniListMapper = (() => {
+            const GQL = 'https://graphql.anilist.co';
+            const cache = new Map();
+            const QUERY = `
+                query ($malId: Int) {
+                    Media(idMal: $malId, type: ANIME) {
+                        id
+                        idMal
+                        title { romaji english }
+                        episodes
+                        format
+                    }
+                }
+            `;
+            return {
+                async resolve(malId) {
+                    if (cache.has(malId)) return cache.get(malId);
+                    try {
+                        const res = await fetch(GQL, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                            body: JSON.stringify({ query: QUERY, variables: { malId } })
+                        });
+                        if (!res.ok) throw new Error(`AniList ${res.status}`);
+                        const json = await res.json();
+                        const media = json?.data?.Media;
+                        if (!media) return null;
+                        const info = {
+                            anilistId: media.id,
+                            malId: media.idMal,
+                            title: media.title?.english || media.title?.romaji,
+                            episodes: media.episodes,
+                            format: media.format
+                        };
+                        cache.set(malId, info);
+                        return info;
+                    } catch (err) {
+                        console.error('AniList mapping failed:', err);
+                        return null;
+                    }
+                }
+            };
+        })();
+
+        /* ============================================================
+           RealAnime — Kuhi backend client (real streams)
+           ============================================================ */
+        const RealAnime = (() => {
+            const base = () => window.AS_CONFIG.kuhiBase;
+
+            async function get(path) {
+                const res = await fetch(`${base()}${path}`);
+                if (!res.ok) throw new Error(`Kuhi ${res.status} @ ${path}`);
+                return res.json();
+            }
+
+            return {
+                async search(title) {
+                    const data = await get(`/anime/search?query=${encodeURIComponent(title)}&per_page=5`);
+                    return data.results || data.data || [];
+                },
+                async episodes(anilistId) {
+                    const data = await get(`/anime/${anilistId}`);
+                    return data.episodes || data.data?.episodes || [];
+                },
+                async streamUrl(anilistId, episodeNum, type = 'sub') {
+                    const data = await get(`/anime/${anilistId}/${episodeNum}?type=${type}`);
+                    const src = (data.sources || data.data?.sources || [])[0];
+                    if (!src?.url) throw new Error('No sources from Kuhi');
+                    const url = src.url;
+                    return url.startsWith('http')
+                        ? `${base()}/proxy?url=${encodeURIComponent(url)}`
+                        : url;
+                },
+                async ping() {
+                    try {
+                        const res = await fetch(base() + '/');
+                        return res.ok;
+                    } catch { return false; }
+                }
+            };
+        })();
+
+        /* ============================================================
+           AnimeAPI — Crunchyroll-shaped client (for your own backend)
+           ============================================================ */
+        const AnimeAPI = (() => {
+            const cfg = window.AS_CONFIG;
+            const base = cfg.proxyBase;
+            const tokens = { access: null, refresh: null, expiry: 0 };
+
+            async function req(path, { method = 'GET', body, headers = {}, raw = false } = {}) {
+                const url = `${base}${path}`;
+                const h = { 'Content-Type': 'application/json', ...headers };
+                if (cfg.apiKey) h['X-Api-Key'] = cfg.apiKey;
+                if (tokens.access && !path.includes('/auth/')) h['Authorization'] = `Bearer ${tokens.access}`;
+
+                const res = await fetch(url, {
+                    method,
+                    headers: h,
+                    body: body ? JSON.stringify(body) : undefined,
+                    credentials: 'include'
+                });
+
+                if (res.status === 401) {
+                    const ok = await Auth.refresh();
+                    if (ok) return req(path, { method, body, headers, raw });
+                }
+                if (!res.ok) throw new Error(`API ${res.status} ${res.statusText} @ ${path}`);
+                return raw ? res : res.json();
+            }
+
+            const Auth = {
+                async anonymous() {
+                    const d = await req(cfg.endpoints.auth, {
+                        method: 'POST',
+                        body: { grant_type: 'client_credentials', scope: 'offline_access' }
+                    });
+                    tokens.access  = d.access_token;
+                    tokens.refresh = d.refresh_token;
+                    tokens.expiry  = Date.now() + ((d.expires_in || 3600) * 1000);
+                    return d;
+                },
+                async login(email, password) {
+                    const d = await req(cfg.endpoints.auth, {
+                        method: 'POST',
+                        body: { grant_type: 'password', username: email, password, scope: 'offline_access' }
+                    });
+                    tokens.access  = d.access_token;
+                    tokens.refresh = d.refresh_token;
+                    tokens.expiry  = Date.now() + ((d.expires_in || 3600) * 1000);
+                    return d;
+                },
+                async refresh() {
+                    if (!tokens.refresh) return false;
+                    try {
+                        const d = await req(cfg.endpoints.auth, {
+                            method: 'POST',
+                            body: { grant_type: 'refresh_token', refresh_token: tokens.refresh }
+                        });
+                        tokens.access = d.access_token;
+                        tokens.expiry = Date.now() + ((d.expires_in || 3600) * 1000);
+                        return true;
+                    } catch { return false; }
+                },
+                get isLoggedIn() { return !!tokens.access; }
+            };
+
+            const Content = {
+                seasons:  (seriesId) => req(cfg.endpoints.seasons.replace('{id}', seriesId)),
+                episodes: (seasonId) => req(cfg.endpoints.episodes.replace('{id}', seasonId))
+            };
+
+            const Stream = {
+                async getStream(animeId, episodeNum, { subLang, audio } = {}) {
+                    return req(cfg.endpoints.stream, {
+                        method: 'POST',
+                        body: {
+                            media_id: `${animeId}_ep${episodeNum}`,
+                            subtitle: subLang || cfg.player.preferredSubLang,
+                            audio:    audio    || cfg.player.preferredAudio,
+                            region:   cfg.region
+                        }
+                    });
+                },
+                async getPlayableUrl(animeId, episodeNum, opts) {
+                    const data = await this.getStream(animeId, episodeNum, opts);
+                    if (data.playable_url) return data.playable_url;
+                    return `${base}${cfg.endpoints.video}?anime_id=${animeId}&episode=${episodeNum}`;
+                }
+            };
+
+            return { Auth, Content, Stream };
+        })();
+
+        /* ============================================================
+           STATE & CONFIG
+           ============================================================ */
+        const Config = {
+            appId: typeof __app_id !== 'undefined' ? __app_id : 'default-animesiddhesh',
+            jikanBase: 'https://api.jikan.moe/v4',
+            mockFallbackEnabled: true
+        };
+
+        const State = {
+            db: null,
+            auth: null,
+            userId: null,
+            catalog: [],
+            watchlist: [],
+            currentAnime: null,
+            activeEpisodes: [],
+            episodeCache: {},
+            kuhiOnline: false
+        };
+
+        const Elements = {
+            grid: document.getElementById('anime-grid'),
+            watchlistContainer: document.getElementById('watchlist-container'),
+            badgeCount: document.getElementById('nav-watchlist-count'),
+            playerModal: document.getElementById('player-modal'),
+            playerContainer: document.getElementById('player-container'),
+            video: document.getElementById('video-player'),
+            videoOverlay: document.getElementById('video-overlay'),
+            videoOverlayContent: document.getElementById('video-overlay-content'),
+            epsContainer: document.getElementById('episodes-container'),
+            sidebar: document.getElementById('watchlist-sidebar'),
+            sidebarBackdrop: document.getElementById('sidebar-backdrop')
+        };
+
+        /* ============================================================
+           UI UTILITIES
+           ============================================================ */
+        const UI = {
+            showToast: (message, type = 'success') => {
+                const toastMsg = document.getElementById('toast-message');
+                const toastIcon = document.getElementById('toast-icon');
+                const toast = document.getElementById('toast');
+                
+                toastMsg.textContent = message;
+                toastIcon.innerHTML = type === 'success' 
+                    ? '<svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>'
+                    : '<svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"></path></svg>';
+                
+                toast.classList.add('show');
+                setTimeout(() => toast.classList.remove('show'), 3000);
+            },
+            
+            toggleSidebar: (show) => {
+                if (show) {
+                    Elements.sidebar.classList.remove('translate-x-full');
+                    Elements.sidebarBackdrop.classList.remove('hidden');
+                    setTimeout(() => Elements.sidebarBackdrop.classList.remove('opacity-0'), 10);
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    Elements.sidebar.classList.add('translate-x-full');
+                    Elements.sidebarBackdrop.classList.add('opacity-0');
+                    setTimeout(() => Elements.sidebarBackdrop.classList.add('hidden'), 300);
+                    if (Elements.playerModal.classList.contains('hidden')) document.body.style.overflow = '';
+                }
+            },
+            
+            renderSkeletons: (count = 10) => {
+                Elements.grid.innerHTML = Array(count).fill(0).map(() => `
+                    <div class="rounded-xl overflow-hidden bg-dark-800 border border-gray-800 h-[380px] flex flex-col">
+                        <div class="h-[250px] shimmer w-full"></div>
+                        <div class="p-4 flex-grow flex flex-col gap-3">
+                            <div class="h-5 shimmer w-3/4 rounded"></div>
+                            <div class="h-3 shimmer w-1/2 rounded"></div>
+                            <div class="flex gap-2 mt-auto"><div class="h-9 shimmer w-full rounded-lg"></div></div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        };
+
+        document.getElementById('toggle-watchlist-btn').onclick = () => UI.toggleSidebar(true);
+        document.getElementById('close-sidebar-btn').onclick = () => UI.toggleSidebar(false);
+        Elements.sidebarBackdrop.onclick = () => UI.toggleSidebar(false);
+
+        /* ============================================================
+           DATA SERVICES
+           ============================================================ */
+        const API = {
+            fetchCatalog: async () => {
+                UI.renderSkeletons(15);
+                try {
+                    const res = await fetch(`${Config.jikanBase}/top/anime?limit=24`);
+                    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                    const json = await res.json();
+                    State.catalog = json.data;
+                    document.getElementById('hero-badge-text').textContent = "JIKAN API CONNECTED";
+                    Renderer.grid();
+                } catch (error) {
+                    console.warn("API error. Loading mock data.", error);
+                    API.loadMockData();
+                    UI.showToast("Rate limited. Loaded offline fallback data.", "error");
+                }
+            },
+            
+            fetchEpisodes: async (animeId, totalEps) => {
+                if (State.episodeCache[animeId]) return State.episodeCache[animeId];
+                
+                const spinner = document.getElementById('ep-loading-spinner');
+                spinner.classList.remove('hidden');
+                let fetchedEps = [];
+                
+                try {
+                    const res = await fetch(`${Config.jikanBase}/anime/${animeId}/episodes`);
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json.data && json.data.length > 0) {
+                            fetchedEps = json.data.map(ep => ({ num: ep.mal_id, title: ep.title || `Episode ${ep.mal_id}` }));
+                        }
+                    }
+                } catch (e) {
+                    console.error("Episode fetch failed", e);
+                }
+                
+                spinner.classList.add('hidden');
+                
+                if (fetchedEps.length === 0) {
+                    const count = totalEps && totalEps > 0 ? totalEps : 12;
+                    for (let i = 1; i <= count; i++) fetchedEps.push({ num: i, title: `Episode ${i}` });
+                }
+                
+                State.episodeCache[animeId] = fetchedEps;
+                return fetchedEps;
+            },
+
+            loadMockData: () => {
+                State.catalog = [
+                    { mal_id: 16498, title: "Attack on Titan", type: "TV", episodes: 25, score: 8.54, rank: 1, synopsis: "Centuries ago, mankind was slaughtered to near extinction...", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/10/47347l.webp" } } },
+                    { mal_id: 38000, title: "Demon Slayer", type: "TV", episodes: 26, score: 8.49, rank: 2, synopsis: "Ever since the death of his father, the burden of supporting the family has fallen upon Tanjirou Kamado.", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1286/99889l.webp" } } },
+                    { mal_id: 11061, title: "Hunter x Hunter", type: "TV", episodes: 148, score: 9.04, rank: 3, synopsis: "Hunter x Hunter is set in a world where Hunters exist to perform all manner of dangerous tasks...", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1337/99013l.webp" } } },
+                    { mal_id: 5114, title: "Fullmetal Alchemist: Brotherhood", type: "TV", episodes: 64, score: 9.10, rank: 4, synopsis: "After a horrific alchemy experiment goes wrong...", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1208/94745l.webp" } } },
+                    { mal_id: 9253, title: "Steins;Gate", type: "TV", episodes: 24, score: 9.07, rank: 5, synopsis: "The eccentric mad scientist Rintarou Okabe has a never-ending thirst for scientific exploration.", images: { webp: { large_image_url: "https://cdn.myanimelist.net/images/anime/1935/127974l.webp" } } }
+                ];
+                document.getElementById('hero-badge-text').textContent = "OFFLINE FALLBACK DATA";
+                Renderer.grid();
+            }
+        };
+
+        /* ============================================================
+           RENDERING ENGINE
+           ============================================================ */
+        const Renderer = {
+            grid: () => {
+                Elements.grid.innerHTML = ''; 
+                State.catalog.forEach((anime, index) => {
+                    const isInList = State.watchlist.some(item => item.id === anime.mal_id);
+                    const title = anime.title;
+                    const img = anime.images?.webp?.large_image_url || anime.images?.jpg?.image_url;
+                    
+                    const card = document.createElement('div');
+                    card.className = "anime-card bg-dark-800 rounded-xl overflow-hidden border border-gray-700/50 flex flex-col h-full animate-fade-in opacity-0 relative group";
+                    card.style.animationDelay = `${index * 30}ms`;
+                    
+                    card.innerHTML = `
+                        <div class="relative aspect-[3/4] w-full overflow-hidden bg-dark-900">
+                            <img src="${img}" alt="${title}" loading="lazy" class="card-image w-full h-full object-cover">
+                            <div class="image-overlay absolute inset-0 flex flex-col justify-between p-3 pointer-events-none">
+                                <div class="flex justify-end">
+                                    <span class="bg-black/80 backdrop-blur-md text-white text-xs font-black px-2 py-1 rounded-md border border-gray-600/50 flex items-center gap-1 shadow">
+                                        <svg class="w-3.5 h-3.5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                        ${anime.score || 'N/A'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center z-10 cursor-pointer watch-trigger">
+                                <div class="bg-brand-500 text-white p-4 rounded-full shadow-[0_0_30px_rgba(139,92,246,0.8)] backdrop-blur-sm transform scale-75 group-hover:scale-100 transition-all duration-300 play-pulse">
+                                    <svg class="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="p-4 flex flex-col flex-grow bg-gradient-to-b from-dark-800 to-dark-900 border-t border-gray-700/30 z-20">
+                            <h3 class="text-sm md:text-base font-bold text-white mb-1 line-clamp-2 leading-tight" title="${title}">${title}</h3>
+                            <div class="flex items-center justify-between mt-1 mb-4 text-xs font-medium text-gray-400">
+                                <span class="bg-dark-700 px-2 py-0.5 rounded text-[10px] uppercase">${anime.type || 'TV'}</span>
+                                <span>${anime.episodes ? anime.episodes + ' eps' : 'Ongoing'}</span>
+                            </div>
+                            <div class="mt-auto flex gap-2">
+                                <button class="watch-btn flex-1 bg-brand-600 hover:bg-brand-500 text-white py-2 rounded-lg font-bold text-xs transition-all shadow-lg hover:shadow-brand-500/30 flex justify-center items-center gap-1">
+                                    Stream Now
+                                </button>
+                                <button id="grid-add-${anime.mal_id}" class="add-list-btn w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-lg border transition-all ${isInList ? 'bg-dark-700 border-gray-600 text-brand-400' : 'bg-dark-800 border-gray-600 text-gray-300 hover:text-white hover:border-brand-400'}" title="Watchlist" ${isInList ? 'disabled' : ''}>
+                                    ${isInList 
+                                        ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>'
+                                        : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    const trigger = () => Player.open(anime);
+                    card.querySelector('.watch-trigger').onclick = trigger;
+                    card.querySelector('.watch-btn').onclick = trigger;
+                    
+                    const addBtn = card.querySelector('.add-list-btn');
+                    if (!isInList) addBtn.onclick = (e) => { e.stopPropagation(); FirebaseOps.addToList(anime); };
+                    
+                    Elements.grid.appendChild(card);
+                });
+            },
+
+            watchlist: () => {
+                Elements.badgeCount.textContent = State.watchlist.length;
+                Elements.badgeCount.classList.toggle('scale-0', State.watchlist.length === 0);
+                Elements.badgeCount.classList.toggle('scale-100', State.watchlist.length > 0);
+
+                if (State.watchlist.length === 0) {
+                    Elements.watchlistContainer.innerHTML = `
+                        <div class="flex flex-col items-center justify-center h-64 text-center px-4 animate-fade-in opacity-80">
+                            <div class="w-16 h-16 bg-dark-800 rounded-full flex items-center justify-center mb-4 border border-gray-700">
+                                <svg class="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
+                            </div>
+                            <p class="text-white font-bold text-lg">Empty List</p>
+                            <p class="text-sm text-gray-500 mt-2">Add anime from the catalog to build your cloud library.</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                Elements.watchlistContainer.innerHTML = '';
+                const sorted = [...State.watchlist].sort((a, b) => b.addedAt - a.addedAt);
+
+                sorted.forEach((item, index) => {
+                    const el = document.createElement('div');
+                    el.className = "flex gap-3 bg-dark-800 p-3 rounded-xl border border-gray-700/50 group hover:border-brand-500/50 hover:bg-dark-800/80 transition-all shadow-sm animate-slide-in-right opacity-0 relative overflow-hidden";
+                    el.style.animationDelay = `${index * 40}ms`;
+                    
+                    el.innerHTML = `
+                        <div class="relative w-16 h-24 flex-shrink-0 cursor-pointer list-trigger rounded-lg overflow-hidden">
+                            <img src="${item.image}" class="w-full h-full object-cover transition-transform group-hover:scale-110" alt="${item.title}">
+                            <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                            </div>
+                        </div>
+                        <div class="flex-grow min-w-0 py-1 flex flex-col">
+                            <h4 class="text-sm font-bold text-white truncate pr-6 cursor-pointer list-trigger hover:text-brand-300" title="${item.title}">${item.title}</h4>
+                            <div class="flex items-center gap-2 mt-1.5">
+                                <span class="text-[10px] font-semibold bg-dark-950 border border-gray-700 px-1.5 py-0.5 rounded text-gray-400 uppercase">${item.type}</span>
+                                <span class="text-xs text-gray-400 font-medium">${item.episodes ? item.episodes + ' Eps' : '? Eps'}</span>
+                            </div>
+                            <div class="mt-auto flex justify-between items-center z-10 relative">
+                                <button class="watch-list-btn text-xs font-bold text-brand-400 hover:text-brand-300 flex items-center gap-1 bg-brand-500/10 px-2 py-1 rounded transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                                    Stream
+                                </button>
+                            </div>
+                        </div>
+                        <button class="remove-btn absolute top-2 right-2 p-1.5 text-gray-500 hover:text-red-400 bg-dark-900/80 hover:bg-red-400/20 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Remove">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                    `;
+                    
+                    const handlePlay = () => {
+                        let aData = State.catalog.find(a => a.mal_id === item.id) || 
+                            { mal_id: item.id, title: item.title, type: item.type, episodes: item.episodes, score: item.score, synopsis: "Loaded from Watchlist..." };
+                        Player.open(aData);
+                    };
+
+                    el.querySelectorAll('.list-trigger').forEach(b => b.onclick = handlePlay);
+                    el.querySelector('.watch-list-btn').onclick = handlePlay;
+                    el.querySelector('.remove-btn').onclick = (e) => { e.stopPropagation(); FirebaseOps.removeFromList(item.id, item.title); };
+                    
+                    Elements.watchlistContainer.appendChild(el);
+                });
+            }
+        };
+
+        /* ============================================================
+           VIDEO PLAYER — HLS + DASH + Kuhi integration
+           ============================================================ */
+        const Player = {
+            _hls: null,
+            _dash: null,
+
+            open: async (anime) => {
+                State.currentAnime = anime;
+                document.getElementById('player-anime-title').textContent = anime.title;
+                document.getElementById('player-score').textContent = anime.score || 'N/A';
+                document.getElementById('player-status-label').innerHTML = `${anime.type || 'TV'} &bull; ${anime.episodes ? anime.episodes + ' Eps' : 'Ongoing'}`;
+                document.getElementById('player-anime-synopsis').textContent = anime.synopsis ? anime.synopsis.replace('[Written by MAL Rewrite]', '').trim() : "Synopsis unavailable.";
+                
+                Elements.video.removeAttribute('src');
+                Elements.video.load();
+                Elements.epsContainer.innerHTML = '';
+                document.getElementById('ep-count-badge').textContent = "Loading...";
+                
+                Elements.playerModal.classList.remove('hidden');
+                void Elements.playerModal.offsetWidth; 
+                Elements.playerModal.classList.remove('opacity-0');
+                Elements.playerContainer.classList.remove('scale-95');
+                document.body.style.overflow = 'hidden';
+                UI.toggleSidebar(false);
+
+                // Resolve AniList ID for Kuhi
+                Player.setLoadingState("RESOLVING ANILIST ID...");
+                const anilistInfo = await AniListMapper.resolve(anime.mal_id);
+                if (anilistInfo) {
+                    State.currentAnime.anilist_id = anilistInfo.anilistId;
+                    State.currentAnime.anilist_episodes = anilistInfo.episodes;
+                    console.log(`✓ AniList resolved: ${anilistInfo.anilistId} (${anilistInfo.title})`);
+                } else {
+                    State.currentAnime.anilist_id = null;
+                    console.warn('No AniList mapping available');
+                }
+                
+                State.activeEpisodes = await API.fetchEpisodes(anime.mal_id, anime.episodes);
+                
+                document.getElementById('ep-count-badge').textContent = `${State.activeEpisodes.length} Eps`;
+                State.activeEpisodes.forEach(ep => {
+                    const btn = document.createElement('button');
+                    btn.className = `ep-btn w-full text-left p-3 rounded-lg border border-gray-700 bg-dark-800 text-gray-300 hover:bg-dark-700 hover:border-gray-500 hover:text-white transition-all flex flex-col gap-1 group`;
+                    btn.innerHTML = `<span class="text-xs font-bold text-brand-400">Episode ${ep.num}</span><span class="text-sm font-medium truncate w-full" title="${ep.title}">${ep.title}</span>`;
+                    btn.onclick = () => Player.playEpisode(ep);
+                    Elements.epsContainer.appendChild(btn);
+                });
+
+                if (State.activeEpisodes.length > 0) Player.playEpisode(State.activeEpisodes[0]);
+            },
+
+            close: () => {
+                Elements.playerModal.classList.add('opacity-0');
+                Elements.playerContainer.classList.add('scale-95');
+                setTimeout(() => {
+                    Elements.playerModal.classList.add('hidden');
+                    if (Player._hls)  { Player._hls.destroy();  Player._hls = null; }
+                    if (Player._dash) { Player._dash.reset();   Player._dash = null; }
+                    Elements.video.pause();
+                    Elements.video.removeAttribute('src'); 
+                    Elements.video.load();
+                }, 300);
+                if (Elements.sidebar.classList.contains('translate-x-full')) document.body.style.overflow = '';
+            },
+
+            playEpisode: async (ep) => {
+                document.getElementById('player-ep-label').textContent = `Episode ${ep.num}`;
+                document.getElementById('player-ep-title').textContent = ep.title;
+                
+                const btns = Elements.epsContainer.querySelectorAll('.ep-btn');
+                btns.forEach((btn, idx) => {
+                    btn.classList.toggle('ep-btn-active', idx === (ep.num - 1));
+                    if (idx === (ep.num - 1)) btn.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+
+                Player.setLoadingState("CONNECTING TO MEDIA SERVER...");
+
+                if (Player._hls)  { Player._hls.destroy();  Player._hls = null; }
+                if (Player._dash) { Player._dash.reset();   Player._dash = null; }
+
+                let playableUrl = null;
+                let source = 'unknown';
+
+                // 1) Try Kuhi first (real streams)
+                if (State.currentAnime.anilist_id) {
+                    try {
+                        playableUrl = await RealAnime.streamUrl(State.currentAnime.anilist_id, ep.num, 'sub');
+                        source = 'kuhi';
+                        console.log(`✓ Kuhi stream: ${playableUrl}`);
+                    } catch (err) {
+                        console.warn('Kuhi failed:', err.message);
+                    }
+                }
+
+                // 2) Try your own Crunchyroll-shaped backend
+                if (!playableUrl) {
+                    try {
+                        playableUrl = await AnimeAPI.Stream.getPlayableUrl(State.currentAnime.mal_id, ep.num);
+                        source = 'crunchyroll-backend';
+                    } catch (err) {
+                        console.warn('Crunchyroll backend failed:', err.message);
+                    }
+                }
+
+                // 3) Demo fallback so player never dies
+                if (!playableUrl) {
+                    playableUrl = window.AS_CONFIG.player.demoFallback;
+                    source = 'demo';
+                    UI.showToast('Using demo stream — backends offline.', 'error');
+                }
+
+                console.log(`▶ Playing via [${source}]: ${playableUrl}`);
+                const video = Elements.video;
+
+                // HLS
+                if (/\.m3u8(\?|$)/i.test(playableUrl) && window.Hls && Hls.isSupported()) {
+                    Player._hls = new Hls({ enableWorker: true, lowLatencyMode: true });
+                    Player._hls.loadSource(playableUrl);
+                    Player._hls.attachMedia(video);
+                    Player._hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                        if (window.AS_CONFIG.player.autoplay) video.play().catch(() => {});
+                    });
+                    Player._hls.on(Hls.Events.ERROR, (_e, data) => {
+                        if (data.fatal) Player.showError("PLAYBACK ERROR", `HLS fatal: ${data.type} — ${data.details || ''}`);
+                    });
+                    return;
+                }
+
+                // DASH
+                if (/\.mpd(\?|$)/i.test(playableUrl) && window.dashjs) {
+                    Player._dash = dashjs.MediaPlayer().create();
+                    Player._dash.initialize(video, playableUrl, window.AS_CONFIG.player.autoplay);
+                    return;
+                }
+
+                // Native
+                video.src = playableUrl;
+                video.load();
+                video.play().catch(() => {});
+            },
+
+            setLoadingState: (msg) => {
+                Elements.videoOverlayContent.innerHTML = `
+                    <div class="relative w-16 h-16">
+                        <div class="absolute inset-0 border-4 border-dark-700 rounded-full"></div>
+                        <div class="absolute inset-0 border-4 border-brand-500 rounded-full border-t-transparent animate-spin"></div>
+                    </div>
+                    <span class="text-brand-400 font-bold text-sm tracking-widest animate-pulse">${msg}</span>
+                `;
+                Elements.videoOverlay.classList.remove('hidden', 'opacity-0');
+            },
+
+            showError: (title, msg) => {
+                Elements.videoOverlay.classList.remove('hidden', 'opacity-0');
+                Elements.videoOverlayContent.innerHTML = `
+                    <div class="flex flex-col items-center gap-4 text-red-400 bg-red-900/40 p-8 rounded-2xl border border-red-500/30 backdrop-blur-md max-w-md text-center">
+                        <svg class="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        <p class="font-black text-xl text-white">${title}</p>
+                        <p class="text-sm text-red-300 mt-1 leading-relaxed">${msg}</p>
+                    </div>`;
+            }
+        };
+
+        document.getElementById('close-player-btn').onclick = Player.close;
+        document.getElementById('close-player-btn-mobile').onclick = Player.close;
+        document.getElementById('player-backdrop').onclick = Player.close;
+
+        Elements.video.addEventListener('playing', () => {
+            Elements.videoOverlay.classList.add('opacity-0');
+            setTimeout(() => Elements.videoOverlay.classList.add('hidden'), 300);
+        });
+        
+        Elements.video.addEventListener('waiting', () => Player.setLoadingState("BUFFERING DATA..."));
+        
+        Elements.video.addEventListener('error', () => {
+            Player.showError("STREAM UNAVAILABLE", "All backends failed. Check that Kuhi is running and reachable.");
+        });
+
+        /* ============================================================
+           FIREBASE
+           ============================================================ */
+        const FirebaseOps = {
+            init: async () => {
+                const authUI = document.getElementById('auth-status');
+                try {
+                    if (typeof __firebase_config === 'undefined') throw new Error("Firebase config missing");
+                    
+                    const app = initializeApp(JSON.parse(__firebase_config));
+                    State.db = getFirestore(app);
+                    State.auth = getAuth(app);
+                    
+                    authUI.classList.remove('hidden');
+
+                    const initialToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                    if (initialToken) await signInWithCustomToken(State.auth, initialToken);
+                    else await signInAnonymously(State.auth);
+                    
+                    State.userId = State.auth.currentUser.uid;
+
+                    // Ping Kuhi so hero badge shows real status
+                    State.kuhiOnline = await RealAnime.ping();
+                    if (State.kuhiOnline) {
+                        document.getElementById('hero-badge-text').textContent = "KUHI BACKEND ONLINE";
+                    }
+
+                    // Try AnimeAPI anonymous auth (ignore if backend absent)
+                    try { await AnimeAPI.Auth.anonymous(); } catch (e) {}
+                    
+                    authUI.innerHTML = `<div class="w-2.5 h-2.5 bg-green-500 rounded-full shadow-[0_0_8px_rgba(34,197,94,0.8)] border border-white/20"></div><span class="text-green-400">Cloud Synced</span>`;
+                    authUI.classList.replace('bg-brand-900/30', 'bg-green-900/20');
+                    authUI.classList.replace('border-brand-500/20', 'border-green-500/30');
+
+                    FirebaseOps.setupListener();
+                } catch (err) {
+                    console.error("Firebase Init Error:", err);
+                    authUI.innerHTML = `<div class="w-2.5 h-2.5 bg-red-500 rounded-full"></div><span class="text-red-400">Offline Mode</span>`;
+                    authUI.classList.replace('bg-brand-900/30', 'bg-red-900/20');
+                    authUI.classList.remove('hidden');
+                    Elements.watchlistContainer.innerHTML = '<div class="p-6 text-center text-red-400 text-sm font-medium">System operating locally. Cloud storage disconnected.</div>';
+                }
+            },
+            
+            setupListener: () => {
+                if (!State.userId) return;
+                const colRef = collection(State.db, 'artifacts', Config.appId, 'users', State.userId, 'watchlist');
+                
+                onSnapshot(colRef, (snapshot) => {
+                    State.watchlist = [];
+                    snapshot.forEach((doc) => State.watchlist.push(doc.data()));
+                    Renderer.watchlist();
+                    if (State.catalog.length > 0) Renderer.grid();
+                }, (error) => {
+                    console.error("Firestore Listen Error:", error);
+                    UI.showToast("Cloud sync connection lost.", "error");
+                });
+            },
+
+            addToList: async (anime) => {
+                if (!State.userId) { UI.showToast("Auth Error: Cloud disconnected.", "error"); return; }
+                const btn = document.getElementById(`grid-add-${anime.mal_id}`);
+                if (btn) {
+                    btn.innerHTML = `<svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                    btn.disabled = true;
+                }
+
+                const docData = {
+                    id: anime.mal_id,
+                    title: anime.title,
+                    image: anime.images?.webp?.large_image_url || anime.images?.jpg?.image_url,
+                    score: anime.score || 'N/A',
+                    episodes: anime.episodes || null,
+                    type: anime.type || 'Unknown',
+                    addedAt: Date.now()
+                };
+
+                try {
+                    const docRef = doc(State.db, 'artifacts', Config.appId, 'users', State.userId, 'watchlist', docData.id.toString());
+                    await setDoc(docRef, docData);
+                    UI.showToast(`Saved ${docData.title}`);
+                } catch (e) {
+                    console.error("Add Error:", e);
+                    UI.showToast("Cloud save failed.", "error");
+                    if (btn) {
+                        btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>`;
+                        btn.disabled = false;
+                    }
+                }
+            },
+            
+            removeFromList: async (id, title) => {
+                if (!State.userId) return;
+                try {
+                    const docRef = doc(State.db, 'artifacts', Config.appId, 'users', State.userId, 'watchlist', id.toString());
+                    await deleteDoc(docRef);
+                    UI.showToast(`Removed ${title}`);
+                } catch (e) {
+                    UI.showToast("Failed to remove.", "error");
+                }
+            }
+        };
+
+        /* ============================================================
+           BOOTSTRAP
+           ============================================================ */
+        window.addEventListener('DOMContentLoaded', () => {
+            FirebaseOps.init();
+            API.fetchCatalog();
+        });
+    </script>
+</body>
+</html>
