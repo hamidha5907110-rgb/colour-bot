@@ -156,7 +156,7 @@
                 <div class="w-full aspect-video bg-black relative shadow-2xl overflow-hidden group rounded-tl-2xl">
                     <video id="video-player" class="w-full h-full absolute inset-0 object-contain bg-black hidden" controls playsinline></video>
                     
-                    <!-- THE FIX: Fallback Iframe -->
+                    <!-- Fallback Iframe -->
                     <iframe id="iframe-player" class="w-full h-full absolute inset-0 bg-black hidden" allowfullscreen="true" frameborder="0" scrolling="no"></iframe>
                     
                     <!-- Loading Overlay -->
@@ -165,7 +165,7 @@
                     </div>
                 </div>
 
-                <!-- THE FIX: MULTI-SERVER SWITCHER -->
+                <!-- MULTI-SERVER SWITCHER -->
                 <div id="server-switcher" class="hidden flex items-center gap-2 p-3 bg-dark-950 border-b border-gray-800 overflow-x-auto custom-scrollbar">
                     <span class="text-xs text-brand-400 font-black uppercase tracking-widest px-2 whitespace-nowrap">Servers:</span>
                     <div id="server-buttons" class="flex gap-2"></div>
@@ -233,6 +233,19 @@
         <span id="toast-message" class="text-sm font-bold text-white tracking-wide">Notification</span>
     </div>
 
+    <!-- REQUIRED FIREBASE CONFIG (Add your actual Firebase keys here) -->
+    <script>
+        const __app_id = "animesiddhesh";
+        const __firebase_config = JSON.stringify({
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123def456"
+        });
+    </script>
+
     <!-- SYSTEM LOGIC -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -245,14 +258,14 @@
         const Config = {
             appId: typeof __app_id !== 'undefined' ? __app_id : 'default-animesiddhesh',
             jikanBase: 'https://api.jikan.moe/v4',
-            proxyBase: 'https://anime-api-production-040b.up.railway.app'
+            proxyBase: '' // <-- FIXED: Empty string uses your local server.js
         };
 
         const State = {
             db: null, auth: null, userId: null,
             catalog: [], watchlist: [], activeEpisodes: [],
             currentAnime: null, currentEp: 1, currentServerIdx: 0,
-            hls: null, searchTimeout: null
+            hls: null, searchTimeout: null, episodeCache: {}
         };
 
         const Elements = {
@@ -268,7 +281,7 @@
             watchlist: document.getElementById('watchlist-container')
         };
 
-        // MULTI-SERVER CONFIGURATION (The Fix for Video Blocking)
+        // MULTI-SERVER CONFIGURATION
         const VideoServers = [
             { name: 'Server 1 (Pro)', url: (id, ep) => `https://vidsrc.pro/embed/anime/${id}/${ep}` },
             { name: 'Server 2 (CC)', url: (id, ep) => `https://vidsrc.cc/v2/embed/anime/${id}/${ep}` },
@@ -327,7 +340,7 @@
                     State.catalog = json.data;
                     Renderer.grid();
                 } catch(e) { UI.toast("Search error", true); }
-            }, 600); // 600ms debounce
+            }, 600);
         });
 
         // ==========================================
@@ -430,7 +443,7 @@
         };
 
         // ==========================================
-        // 5. SMART PLAYER (WITH SERVER SWITCHER)
+        // 5. SMART PLAYER
         // ==========================================
         const Player = {
             open: async (anime) => {
@@ -466,7 +479,7 @@
                     btn.textContent = srv.name;
                     btn.onclick = () => {
                         State.currentServerIdx = idx;
-                        Player.renderServers(); // Re-render to update active button
+                        Player.renderServers(); 
                         Elements.iframe.src = srv.url(State.currentAnime.mal_id || State.currentAnime.id, State.currentEp.num);
                     };
                     Elements.serverBtns.appendChild(btn);
@@ -489,7 +502,6 @@
                 if (State.hls) { State.hls.destroy(); State.hls = null; }
                 Elements.video.pause(); Elements.video.classList.add('hidden');
                 
-                // Fetch direct stream with a 3-second timeout so user doesn't wait forever
                 try {
                     const controller = new AbortController();
                     const timeoutId = setTimeout(() => controller.abort(), 3000);
@@ -519,7 +531,6 @@
                     clearTimeout(timeoutId);
                 } catch (err) { console.warn("Direct stream fetch timeout/fail. Using iframes."); }
 
-                // SMART FALLBACK: If direct stream fails or times out, use the Multi-Server Switcher
                 Player.renderServers();
                 Elements.video.classList.add('hidden');
                 Elements.iframe.classList.remove('hidden');
